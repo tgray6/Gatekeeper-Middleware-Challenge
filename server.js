@@ -1,22 +1,8 @@
 const express = require('express');
-// you'll need to use `queryString` in your `gateKeeper` middleware function
 const queryString = require('query-string');
-
 
 const app = express();
 
-// For this challenge, we're hard coding a list of users, because
-// we haven't learned about databases yet. Normally, you'd store
-// user data in a database, and query the database to find
-// a particular user.
-//
-// ALSO, for this challenge, we're storing user passwords as
-// plain text. This is something you should NEVER EVER EVER 
-// do in a real app. Instead, always use cryptographic
-// password hashing best practices (aka, the tried and true
-// ways to keep user passwords as secure as possible).
-// You can learn more about password hashing later
-// here: https://crackstation.net/hashing-security.htm
 const USERS = [
   {id: 1,
    firstName: 'Joe',
@@ -57,22 +43,43 @@ const USERS = [
 ];
 
 
-// write a `gateKeeper` middleware function that:
-//  1. looks for a 'x-username-and-password' request header
-//  2. parses values sent for `user` and `pass` from 'x-username-and-password'
-//  3. looks for a user object matching the sent username and password values
-//  4. if matching user found, add the user object to the request object
-//     (aka, `req.user = matchedUser`)
 function gateKeeper(req, res, next) {
-  // your code should replace the line below
+  //  `Object.assign` here gives us a neat, clean way to express the following idea:
+  //  We want to create an object with default
+  //  values of `null` for `user` and `pass`,
+  //  and *then*, if after parsing the request header
+  //  we find values for `user` and `pass` set
+  //  there, we'll use those over the default.
+  //  Either way, we're guaranteed to end up
+  //  with an object that has `user` and `pass`
+  //  keys.
+  const {user, pass} = Object.assign(
+    {user: null, pass: null}, queryString.parse(req.get('x-username-and-password')));
+
+  // ^^ the more verbose way to express this is:
+  //
+  // const parsedHeader = queryString.parse(req.get('x-username-and-password'));
+  // const user = parsedHeader.user || null;
+  // const pass = parsedHeader.pass || null;
+
+  // if there's a user in `USERS` with the username
+  // and password from the request headers,
+  // we set `req.user` equal to that object.
+  // Otherwise, `req.user` will be undefined.
+  req.user = USERS.find(
+    (usr, index) => usr.userName === user && usr.password === pass);
+  // gotta call `next()`!!! otherwise this middleware
+  // will hang.
   next();
 }
 
-// Add the middleware to your app!
+// use `gateKeeper` for all routes in our app.
+// this means `req.user` will always be added
+// to the request object.
+app.use(gateKeeper);
 
-// this endpoint returns a json object representing the user making the request,
-// IF they supply valid user credentials. This endpoint assumes that `gateKeeper` 
-// adds the user object to the request if valid credentials were supplied.
+
+
 app.get("/api/users/me", (req, res) => {
   // send an error message if no or wrong credentials sent
   if (req.user === undefined) {
